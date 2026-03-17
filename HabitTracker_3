@@ -438,3 +438,551 @@ public class HabitTracker_3 extends JFrame {
                 ()->new HabitTracker_3().setVisible(true));
     }
 }
+
+
+
+
+
+package HabitTracker_2;
+
+import javax.swing.*;
+import javax.swing.border.*;
+import java.awt.*;
+import java.io.*;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
+
+// --- Habit Data Class ---
+class Habit implements Serializable {
+    private static final long serialVersionUID = 1L;
+    private String name;
+    private int goal;
+    private List<String> completionDates;
+
+    public Habit(String name, int goal) {
+        this.name = name;
+        this.goal = goal;
+        this.completionDates = new ArrayList<>();
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public int getGoal() {
+        return goal;
+    }
+
+    public List<String> getCompletionDates() {
+        return completionDates;
+    }
+
+    public void addCompletion() {
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd (HH:mm:ss)");
+        completionDates.add(LocalDateTime.now().format(formatter));
+    }
+
+    public int getStreakCount() {
+        return completionDates.size();
+    }
+
+    public boolean isGoalReached() {
+        return getStreakCount() >= goal;
+    }
+}
+
+// --- Achievement Entry (persisted separately) ---
+class AchievementEntry implements Serializable {
+    private static final long serialVersionUID = 1L;
+    private String habitName;
+    private int goal;
+    private String completedDateTime;
+
+    public AchievementEntry(String habitName, int goal, String completedDateTime) {
+        this.habitName = habitName;
+        this.goal = goal;
+        this.completedDateTime = completedDateTime;
+    }
+
+    public String getHabitName() {
+        return habitName;
+    }
+
+    public int getGoal() {
+        return goal;
+    }
+
+    public String getCompletedDateTime() {
+        return completedDateTime;
+    }
+}
+
+// --- Achievements Frame ---
+class AchievementFrame extends JFrame {
+
+    public AchievementFrame(List<AchievementEntry> achievements) {
+        setTitle("Achievements");
+        setSize(450, 500);
+        setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+        setLocationRelativeTo(null);
+
+        JPanel root = new JPanel(new BorderLayout());
+        root.setBackground(Color.WHITE);
+
+        // Header
+        JPanel header = new JPanel();
+        header.setBackground(Color.WHITE);
+        header.setBorder(BorderFactory.createEmptyBorder(15, 20, 5, 20));
+        JLabel title = new JLabel("ACHIEVEMENTS");
+        title.setFont(new Font("SansSerif", Font.BOLD, 20));
+        title.setForeground(Color.BLACK);
+        header.add(title);
+
+        // Content
+        JPanel contentPanel = new JPanel();
+        contentPanel.setLayout(new BoxLayout(contentPanel, BoxLayout.Y_AXIS));
+        contentPanel.setBackground(Color.WHITE);
+        contentPanel.setBorder(BorderFactory.createEmptyBorder(10, 15, 15, 15));
+
+        if (achievements == null || achievements.isEmpty()) {
+            JLabel empty = new JLabel("No achievements yet. Complete a habit to earn one!");
+            empty.setForeground(Color.BLACK);
+            empty.setFont(new Font("SansSerif", Font.PLAIN, 13));
+            empty.setAlignmentX(Component.CENTER_ALIGNMENT);
+            contentPanel.add(Box.createRigidArea(new Dimension(0, 20)));
+            contentPanel.add(empty);
+        } else {
+            int rank = 1;
+            for (AchievementEntry entry : achievements) {
+                JPanel card = buildCard(entry, rank++);
+                contentPanel.add(card);
+                contentPanel.add(Box.createRigidArea(new Dimension(0, 8)));
+            }
+        }
+
+        JScrollPane scroll = new JScrollPane(contentPanel);
+        scroll.setBorder(BorderFactory.createEmptyBorder());
+        scroll.setBackground(Color.WHITE);
+        scroll.getViewport().setBackground(Color.WHITE);
+
+        root.add(header, BorderLayout.NORTH);
+        root.add(scroll, BorderLayout.CENTER);
+        setContentPane(root);
+    }
+
+    private JPanel buildCard(AchievementEntry entry, int rank) {
+        JPanel card = new JPanel(new BorderLayout(10, 5));
+        card.setBackground(Color.WHITE);
+        card.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(Color.BLACK, 1),
+                BorderFactory.createEmptyBorder(10, 14, 10, 14)));
+        card.setMaximumSize(new Dimension(Integer.MAX_VALUE, 75));
+
+        // Rank label
+        JLabel badge = new JLabel("#" + rank);
+        badge.setFont(new Font("SansSerif", Font.BOLD, 16));
+        badge.setForeground(Color.BLACK);
+        badge.setPreferredSize(new Dimension(35, 40));
+        badge.setHorizontalAlignment(SwingConstants.CENTER);
+
+        // Info
+        JPanel info = new JPanel();
+        info.setOpaque(false);
+        info.setLayout(new BoxLayout(info, BoxLayout.Y_AXIS));
+
+        JLabel nameLabel = new JLabel(entry.getHabitName());
+        nameLabel.setFont(new Font("SansSerif", Font.BOLD, 13));
+        nameLabel.setForeground(Color.BLACK);
+
+        JLabel detailLabel = new JLabel(
+                "Goal: " + entry.getGoal() + " days  |  Completed: " + entry.getCompletedDateTime());
+        detailLabel.setFont(new Font("SansSerif", Font.PLAIN, 11));
+        detailLabel.setForeground(Color.BLACK);
+
+        info.add(nameLabel);
+        info.add(Box.createRigidArea(new Dimension(0, 4)));
+        info.add(detailLabel);
+
+        card.add(badge, BorderLayout.WEST);
+        card.add(info, BorderLayout.CENTER);
+
+        return card;
+    }
+}
+
+// --- Frame for Completed Habits (History + Restart) ---
+class CompletedHabitsFrame extends JFrame {
+    public CompletedHabitsFrame(List<Habit> habits, HabitTracker mainApp) {
+        setTitle("Completed Habits History");
+        setSize(450, 400);
+        setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+        setLocationRelativeTo(null);
+
+        JPanel contentPanel = new JPanel();
+        contentPanel.setLayout(new BoxLayout(contentPanel, BoxLayout.Y_AXIS));
+        contentPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+
+        boolean found = false;
+        if (habits != null) {
+            for (Habit h : habits) {
+                if (h.isGoalReached()) {
+                    found = true;
+                    JPanel card = new JPanel(new BorderLayout(10, 5));
+                    card.setBorder(BorderFactory.createTitledBorder(h.getName()));
+                    card.setMaximumSize(new Dimension(420, 90));
+
+                    String lastDate = h.getCompletionDates().isEmpty() ? "N/A"
+                            : h.getCompletionDates().get(h.getCompletionDates().size() - 1);
+
+                    JLabel details = new JLabel(
+                            "<html>Goal: " + h.getGoal() + " days<br>Finished: " + lastDate + "</html>");
+
+                    JButton restartBtn = new JButton("Restart");
+                    restartBtn.addActionListener(e -> {
+                        h.getCompletionDates().clear();
+                        mainApp.refreshUI();
+                        dispose();
+                    });
+
+                    card.add(details, BorderLayout.CENTER);
+                    card.add(restartBtn, BorderLayout.EAST);
+                    contentPanel.add(card);
+                    contentPanel.add(Box.createRigidArea(new Dimension(0, 10)));
+                }
+            }
+        }
+
+        if (!found)
+            contentPanel.add(new JLabel("No completed habits yet. Keep going!"));
+
+        add(new JScrollPane(contentPanel));
+    }
+}
+
+// --- Main Application ---
+public class HabitTracker extends JFrame {
+    private List<Habit> habits;
+    private List<AchievementEntry> achievements; // Persistent achievements — never deleted
+    private JPanel habitListContainer;
+    private JComboBox<String> habitSelector;
+    private JButton deleteBtn, updateBtn;
+    private JLabel statusLabel;
+    private final String FILE_NAME = "habits.dat";
+    private final String ACHIEVEMENTS_FILE = "achievements.dat";
+
+    public HabitTracker() {
+        loadData();
+        loadAchievements();
+        setupUI();
+        refreshUI();
+    }
+
+    private void setupUI() {
+        setTitle("Habit Tracker");
+        setSize(600, 640);
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setLocationRelativeTo(null);
+
+        try {
+            ImageIcon icon = new ImageIcon("fire_streak.png");
+            setIconImage(icon.getImage());
+        } catch (Exception e) {
+            System.out.println("Icon not found.");
+        }
+
+        JPanel mainContent = new JPanel(new BorderLayout(10, 10));
+        mainContent.setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
+        setContentPane(mainContent);
+
+        JPanel topPanel = new JPanel();
+        topPanel.setLayout(new BoxLayout(topPanel, BoxLayout.Y_AXIS));
+
+        JButton addBtn = new JButton("+ Add New Habit");
+        addBtn.setAlignmentX(Component.CENTER_ALIGNMENT);
+        addBtn.addActionListener(e -> addNewHabit());
+
+        habitListContainer = new JPanel();
+        habitListContainer.setLayout(new BoxLayout(habitListContainer, BoxLayout.Y_AXIS));
+        JScrollPane scrollPane = new JScrollPane(habitListContainer);
+        scrollPane.setPreferredSize(new Dimension(450, 300));
+        scrollPane.setBorder(BorderFactory.createTitledBorder("Daily Progress"));
+
+        topPanel.add(addBtn);
+        topPanel.add(Box.createRigidArea(new Dimension(0, 10)));
+        topPanel.add(scrollPane);
+
+        JPanel controlPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 5, 5));
+        habitSelector = new JComboBox<>();
+        updateBtn = new JButton("Update");
+        deleteBtn = new JButton("Delete");
+        JButton historyBtn = new JButton("History");
+        JButton achieveBtn = new JButton("Achievements");
+
+        updateBtn.addActionListener(e -> updateHabit());
+        deleteBtn.addActionListener(e -> deleteHabit());
+        historyBtn.addActionListener(e -> new CompletedHabitsFrame(habits, this).setVisible(true));
+        achieveBtn.addActionListener(e -> new AchievementFrame(achievements).setVisible(true));
+
+        controlPanel.add(new JLabel("Select:"));
+        controlPanel.add(habitSelector);
+        controlPanel.add(updateBtn);
+        controlPanel.add(deleteBtn);
+        controlPanel.add(historyBtn);
+        controlPanel.add(achieveBtn);
+
+        statusLabel = new JLabel("Status: Ready");
+        statusLabel.setForeground(new Color(50, 50, 150));
+
+        add(topPanel, BorderLayout.CENTER);
+        add(controlPanel, BorderLayout.NORTH);
+        add(statusLabel, BorderLayout.SOUTH);
+    }
+
+    public void refreshUI() {
+        habitListContainer.removeAll();
+        habitSelector.removeAllItems();
+
+        boolean anyActive = false;
+        for (Habit h : habits) {
+            // Always add to selector (for update/delete targeting)
+            habitSelector.addItem(h.getName());
+
+            if (!h.isGoalReached()) {
+                anyActive = true;
+                JPanel row = new JPanel(new BorderLayout(10, 0));
+                row.setMaximumSize(new Dimension(450, 60));
+                row.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
+
+                int currentStreak = h.getStreakCount();
+                String displayName = h.getName();
+                if (currentStreak >= 3) {
+                    displayName = displayName + " (HOT!)";
+                }
+
+                JButton checkIn = new JButton("Log: " + displayName);
+                final Habit habit = h;
+                checkIn.addActionListener(e -> {
+                    habit.addCompletion();
+                    if (habit.isGoalReached()) {
+                        // Record to achievements when goal is first reached
+                        recordAchievement(habit);
+                        JOptionPane.showMessageDialog(this,
+                                "Goal reached for \"" + habit.getName()
+                                        + "\"!\nMoved to History & saved to Achievements.");
+                    }
+                    refreshUI();
+                });
+
+                JProgressBar bar = new JProgressBar(0, h.getGoal());
+                bar.setValue(currentStreak);
+                bar.setStringPainted(true);
+                bar.setString(currentStreak + "/" + h.getGoal() + " Days");
+
+                if (currentStreak >= 3) {
+                    // Hot streak indicator — no special color in plain theme
+                }
+
+                row.add(checkIn, BorderLayout.WEST);
+                row.add(bar, BorderLayout.CENTER);
+                habitListContainer.add(row);
+                habitListContainer.add(Box.createRigidArea(new Dimension(0, 5)));
+            }
+        }
+
+        if (!anyActive)
+            habitListContainer.add(new JLabel("No active habits. Click + to start one!"));
+
+        updateBtn.setEnabled(!habits.isEmpty());
+        deleteBtn.setEnabled(!habits.isEmpty());
+
+        long activeCount = habits.stream().filter(h -> !h.isGoalReached()).count();
+        statusLabel.setText("Active Habits: " + activeCount + "  |  Achievements: " + achievements.size());
+
+        revalidate();
+        repaint();
+        saveData();
+    }
+
+    /**
+     * Records a habit completion into the persistent achievements list.
+     * Avoids duplicates — only records if not already in achievements.
+     */
+    private void recordAchievement(Habit h) {
+        // Avoid duplicate entries for the same habit name + goal
+        boolean alreadyRecorded = achievements.stream()
+                .anyMatch(a -> a.getHabitName().equals(h.getName()) && a.getGoal() == h.getGoal());
+
+        if (!alreadyRecorded) {
+            String completedAt = h.getCompletionDates().isEmpty()
+                    ? LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd (HH:mm:ss)"))
+                    : h.getCompletionDates().get(h.getCompletionDates().size() - 1);
+
+            achievements.add(new AchievementEntry(h.getName(), h.getGoal(), completedAt));
+            saveAchievements();
+        }
+    }
+
+    private void addNewHabit() {
+        String name = JOptionPane.showInputDialog(this, "Habit Name:");
+        if (name == null || name.trim().isEmpty())
+            return;
+        String trimmedName = name.trim();
+
+        for (Habit h : habits) {
+            if (h.getName().equalsIgnoreCase(trimmedName)) {
+                JOptionPane.showMessageDialog(this, "Habit already exists!", "Error", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+        }
+
+        String goalStr = JOptionPane.showInputDialog(this, "Goal (Days):", "7");
+        if (goalStr == null)
+            return;
+        try {
+            int goal = Integer.parseInt(goalStr);
+            habits.add(new Habit(trimmedName, goal));
+            refreshUI();
+        } catch (NumberFormatException e) {
+            JOptionPane.showMessageDialog(this, "Please enter a valid number.");
+        }
+    }
+
+    private void updateHabit() {
+        String selected = (String) habitSelector.getSelectedItem();
+        if (selected == null)
+            return;
+
+        for (int i = 0; i < habits.size(); i++) {
+            if (habits.get(i).getName().equals(selected)) {
+                Habit old = habits.get(i);
+                String newName = JOptionPane.showInputDialog(this, "New Name:", old.getName());
+                if (newName == null || newName.trim().isEmpty())
+                    return;
+                String trimmedNewName = newName.trim();
+
+                if (!trimmedNewName.equalsIgnoreCase(old.getName())) {
+                    for (Habit h : habits) {
+                        if (h.getName().equalsIgnoreCase(trimmedNewName)) {
+                            JOptionPane.showMessageDialog(this, "Name already exists!");
+                            return;
+                        }
+                    }
+                }
+
+                String newGoalStr = JOptionPane.showInputDialog(this, "New Goal:", old.getGoal());
+                if (newGoalStr == null)
+                    return;
+                try {
+                    int newGoal = Integer.parseInt(newGoalStr);
+                    Habit updated = new Habit(trimmedNewName, newGoal);
+                    updated.getCompletionDates().addAll(old.getCompletionDates());
+                    habits.set(i, updated);
+                    refreshUI();
+                    return;
+                } catch (NumberFormatException e) {
+                    JOptionPane.showMessageDialog(this, "Invalid number.");
+                }
+            }
+        }
+    }
+
+    /**
+     * Delete logic:
+     * - If habit is COMPLETED (goal reached) → block deletion or warn user
+     * that it is already in Achievements and only remove from active list.
+     * - If habit is IN-PROGRESS → remove from habits list only.
+     * - Achievements list is NEVER touched on delete.
+     */
+    private void deleteHabit() {
+        String selected = (String) habitSelector.getSelectedItem();
+        if (selected == null)
+            return;
+
+        Habit target = null;
+        for (Habit h : habits) {
+            if (h.getName().equals(selected)) {
+                target = h;
+                break;
+            }
+        }
+        if (target == null)
+            return;
+
+        if (target.isGoalReached()) {
+            // Completed habit — it's already in Achievements, just remove from active list
+            int confirm = JOptionPane.showConfirmDialog(this,
+                    "\"" + selected + "\" is already completed and saved in Achievements.\n"
+                            + "Remove it from the active list? (It will stay in Achievements)",
+                    "Remove Completed Habit",
+                    JOptionPane.YES_NO_OPTION);
+            if (confirm == JOptionPane.YES_OPTION) {
+                habits.removeIf(h -> h.getName().equals(selected));
+                refreshUI();
+            }
+        } else {
+            // In-progress habit — confirm and delete
+            int confirm = JOptionPane.showConfirmDialog(this,
+                    "Delete \"" + selected + "\"? Progress will be lost.",
+                    "Delete Habit",
+                    JOptionPane.YES_NO_OPTION,
+                    JOptionPane.WARNING_MESSAGE);
+            if (confirm == JOptionPane.YES_OPTION) {
+                habits.removeIf(h -> h.getName().equals(selected));
+                refreshUI();
+            }
+        }
+    }
+
+    // --- Persistence ---
+
+    private void saveData() {
+        try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(FILE_NAME))) {
+            oos.writeObject(habits);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private void loadData() {
+        File file = new File(FILE_NAME);
+        if (!file.exists()) {
+            habits = new ArrayList<>();
+            return;
+        }
+        try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(FILE_NAME))) {
+            habits = (List<Habit>) ois.readObject();
+        } catch (Exception e) {
+            habits = new ArrayList<>();
+        }
+    }
+
+    private void saveAchievements() {
+        try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(ACHIEVEMENTS_FILE))) {
+            oos.writeObject(achievements);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private void loadAchievements() {
+        File file = new File(ACHIEVEMENTS_FILE);
+        if (!file.exists()) {
+            achievements = new ArrayList<>();
+            return;
+        }
+        try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(ACHIEVEMENTS_FILE))) {
+            achievements = (List<AchievementEntry>) ois.readObject();
+        } catch (Exception e) {
+            achievements = new ArrayList<>();
+        }
+    }
+
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(() -> new HabitTracker().setVisible(true));
+    }
+}
+
